@@ -7,7 +7,8 @@ DECLARE
     primary_key_conditions varchar;
     primary_key_conditions_new varchar;
     columnnames varchar;
-    old_columnnames varchar;
+    new_columnnames varchar;
+    column_reset varchar;
     tablename_wo_schema varchar;
 BEGIN
     SELECT SUBSTRING(tablename, POSITION('.' in tablename)+1) INTO tablename_wo_schema;
@@ -23,8 +24,9 @@ BEGIN
 
     SELECT STRING_agg(cn.pk, ' AND ')INTO primary_key_conditions FROM (SELECT CONCAT(column_name, '=OLD.',column_name)as pk FROM primary_keys WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to') as cn;
     SELECT STRING_agg(cn.pk, ' AND ')INTO primary_key_conditions_new FROM (SELECT CONCAT(column_name, '=NEW.',column_name)as pk FROM primary_keys WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to') as cn;
-    SELECT STRING_agg(cn.column_name, ',') INTO columnnames FROM (SELECT column_name FROM information_schema.columns WHERE table_name like tablename_wo_schema ORDER BY column_Name) as cn;
-    SELECT STRING_agg(cn.column, ',') INTO old_columnnames FROM (SELECT CONCAT('OLD.',column_name) as column FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' AND column_name <> 'valid_from' ORDER BY column_Name) as cn;
+    SELECT STRING_agg(cn.column_name, ',') INTO columnnames FROM (SELECT column_name FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' AND column_name <> 'valid_from' ORDER BY column_Name) as cn;
+    SELECT STRING_agg(cn.column, ',') INTO new_columnnames FROM (SELECT CONCAT('NEW.',column_name) as column FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' AND column_name <> 'valid_from' ORDER BY column_Name) as cn;
+    SELECT STRING_agg(concat(cn.ncolumn, '=', cn.ocolumn), ';') INTO column_reset FROM (SELECT CONCAT('OLD.',column_name) as ocolumn, CONCAT('NEW.', column_name) as ncolumn FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
 
 
     -- Delete Rule
@@ -38,11 +40,14 @@ BEGIN
                    'RETURNS TRIGGER ' ||
                    'LANGUAGE PLPGSQL ' ||
                    'AS $update_trigger_function$ ' ||
-                   'BEGIN'
-                   '    INSERT INTO %3$s(%1$s) VALUES(%2$s, OLD.valid_from - interval ''1 milliseconds'', now() );' ||
+                   'BEGIN' ||
+                   '    IF new.valid_to IS NULL THEN ' ||
+                   '    INSERT INTO %3$s(%1$s) VALUES(%2$s);' ||
+                   '    %4$s;' ||
                    '    NEW.valid_to = now();' ||
+                   '    END IF;' ||
                    '    RETURN NEW;' ||
-                   'END; $update_trigger_function$ ', columnnames, old_columnnames, tablename_wo_schema);
+                   'END; $update_trigger_function$ ', columnnames, new_columnnames, tablename_wo_schema,column_reset);
 
     EXECUTE format('CREATE TRIGGER update_trigger_%2$s ' ||
                    'BEFORE UPDATE ' ||
