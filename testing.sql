@@ -25,6 +25,16 @@ SELECT * from accounts_hist;
 
 
 
-CALL add_versioning_integrated('accounts');
-CALL add_versioning_separated('accounts');
-CALL add_versioning_hybrid('accounts');
+CALL add_versioning_integrated('public.accounts');
+CALL add_versioning_separated('public.accounts');
+CALL add_versioning_hybrid('public.accounts');
+
+-- Querying
+
+
+INSERT INTO download(id, timestamp, user_id)  VALUES(1,now(), 1);
+INSERT INTO query(id, d_id, original_query) VALUES (1,1, 'SELECT * FROM accounts WHERE id = #i1 AND id = #i2 AND t like ''#s1'' AND test < #t1 ');
+INSERT INTO parameters(id, q_id, int_array, string_array,timestamp_array) VALUES (1,1, ARRAY [1,0,4], ARRAY ['test'], ARRAY[now()]);
+
+SELECT * FROM rebuild_query(1);
+
