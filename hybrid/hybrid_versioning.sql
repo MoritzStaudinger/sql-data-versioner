@@ -10,6 +10,10 @@ DECLARE
     old_columnnames varchar;
     tablename_wo_schema varchar;
 BEGIN
+    IF tablename in (SELECT name FROM versioned_tables) THEN
+        RAISE EXCEPTION 'TABLE already versioned';
+        RETURN;
+    end if;
     SELECT SUBSTRING(tablename, POSITION('.' in tablename)+1) INTO tablename_wo_schema;
     EXECUTE format('ALTER TABLE %s ADD valid_from Timestamp;', tablename);
     EXECUTE format('ALTER TABLE %s ALTER COLUMN valid_from SET default now();', tablename);
@@ -20,7 +24,7 @@ BEGIN
 
     --RAISE NOTICE '%', tablename_wo_schema;
     -- Change Primary Key for History table
-    RAISE NOTICE '%', tablename_wo_schema;
+    --RAISE NOTICE '%', tablename_wo_schema;
     SELECT STRING_agg(distinct column_name, ',')INTO primary_key FROM primary_keys WHERE table_name like tablename_wo_schema;
     SELECT STRING_agg(cn.pk, ' AND ')INTO primary_key_conditions FROM (SELECT CONCAT(column_name, '=OLD.',column_name)as pk FROM primary_keys WHERE table_name like tablename_wo_schema) as cn;
     EXECUTE format('ALTER TABLE %1$s_hist ADD CONSTRAINT %1$s_hist_pkey primary key(%2$s,valid_from); ', tablename_wo_schema,primary_key);
