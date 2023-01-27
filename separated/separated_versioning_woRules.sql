@@ -37,8 +37,8 @@ BEGIN
 
     -- Create necessary triggers on insert, update and delete
     -- Extract Columnames
-    SELECT STRING_agg(cn.column_name, ',') INTO columnnames FROM (SELECT column_name FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
-    SELECT STRING_agg(cn.column, ',') INTO old_columnnames FROM (SELECT CONCAT('OLD.',column_name) as column FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
+    SELECT STRING_agg(distinct cn.column_name, ',') INTO columnnames FROM (SELECT column_name FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
+    SELECT STRING_agg(distinct cn.column, ',') INTO old_columnnames FROM (SELECT CONCAT('OLD.',column_name) as column FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
     SELECT STRING_agg(DISTINCT cn.column, ',') INTO new_columnnames FROM (SELECT CONCAT('NEW.',column_name) as column FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' AND column_name <> 'valid_from' ORDER BY column_Name) as cn;
     SELECT STRING_agg(concat(cn.ncolumn, '=', cn.ocolumn), ';') INTO column_reset FROM (SELECT CONCAT('OLD.',column_name) as ocolumn, CONCAT('NEW.', column_name) as ncolumn FROM information_schema.columns WHERE table_name like tablename_wo_schema AND column_name <> 'valid_to' ORDER BY column_Name) as cn;
 
@@ -91,6 +91,40 @@ END
 $$;
 
 --CALL add_versioning_separated('data.station_image');
+DROP procedure if exists add_all_versioning();
+CREATE OR REPLACE procedure add_all_versioning()
+LANGUAGE plpgsql
+AS
+    $$
+    DECLARE
+        table_names varchar[];
+        altertable varchar[];
+        t varchar;
+        r record;
 
+    BEGIN
+        ALTER TABLE data.station_image ADD PRIMARY KEY (station_id, image_id);
+        SELECT array_agg(concat(concat(concat(concat('ALTER TABLE ', concat(concat(constraint_schema, '.'), table_name),' '), 'DROP CONSTRAINT '), quote_ident(constraint_name)),';')) INTO altertable FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE constraint_schema like 'data' and constraint_name like '%fkey';
+
+        FOREACH t IN ARRAY altertable LOOP
+           raise notice '%', t;
+            EXECUTE FORMAT(t);
+        end loop;
+
+        SELECT array_agg(concat(concat(concat(concat('ALTER TABLE ', concat(concat(constraint_schema, '.'), table_name),' '), 'DROP CONSTRAINT '), constraint_name),';')) INTO altertable FROM INFORMATION_SCHEMA.table_constraints WHERE constraint_schema like 'data' and constraint_type like 'CHECK' and constraint_name not like '%_not_null';
+        FOREACH t IN ARRAY altertable LOOP
+            raise notice '%', t;
+            EXECUTE FORMAT(t);
+        end loop;
+         RAISE NOTICE 'start';
+        SELECT array_agg(CONCAT('data.',table_name)) INTO table_names FROM information_schema.tables WHERE table_schema = 'data';
+        FOREACH t IN ARRAY table_names LOOP
+            RAISE NOTICE '%', t;
+            CALL add_versioning_separated(t);
+        END LOOP;
+
+    END
+    $$;
+end;
 
 
