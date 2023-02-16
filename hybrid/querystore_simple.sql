@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS query_simple (
     d_id serial,
     doi text,
     original_query text,
-    normalized_query text,
+    re_execute_query text,
     query_hash varchar(1024),
     result_nr INTEGER,
     result_hash varchar,
@@ -39,17 +39,15 @@ end;
 
 
 DROP procedure if exists save_query_simple;
-CREATE OR REPLACE procedure save_query_simple(query text, result_nr integer, result_hash text, download_id integer)
+CREATE OR REPLACE procedure save_query_simple(query text, re_execute text, result_nr integer, result_hash text, download_id integer)
 LANGUAGE plpgsql
 AS
     $$
-    DECLARE
-        query_hash text;
     BEGIN
 
-        INSERT INTO query_simple(d_id, original_query, normalized_query, query_hash, result_nr, result_hash)
+        INSERT INTO query_simple(d_id, original_query, re_execute_query, query_hash, result_nr, result_hash)
 
-        VALUES(download_id, query, query, sha512(query::bytea), result_nr, result_hash);
+        VALUES(download_id, query, re_execute, sha512(query::bytea), result_nr, result_hash);
     END
     $$;
 end;

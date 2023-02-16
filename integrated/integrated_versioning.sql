@@ -114,3 +114,10 @@ AS
     $$;
 end;
 
+alter table data.dataset drop constraint dataset_timeseries_id_key;
+
+SELECT now();
+call add_all_versioning();
+SELECT now();
+
+VACUUM FULL;

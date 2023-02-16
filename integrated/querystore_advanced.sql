@@ -74,39 +74,27 @@ AS
     $$;
 end;
 
-DROP procedure if exists save_download_advanced;
-CREATE OR REPLACE procedure save_download_advanced(ts timestamp, user_id integer)
-LANGUAGE plpgsql
-AS
-    $$
-    BEGIN
-         INSERT INTO download_advanced(timestamp, user_id) VALUES(ts, user_id);
-    END
-    $$;
-end;
-
-CALL save_download_advanced(TIMESTAMP '2004-10-19 10:23:54', 1);
-
-DROP procedure if exists save_query_advanced(text, integer);
-CREATE OR REPLACE procedure save_query_advanced(query text, u_id integer)
+DROP function if exists save_download_advanced;
+CREATE OR REPLACE function save_download_advanced(ts timestamp, u_id integer)
+RETURNS integer
 LANGUAGE plpgsql
 AS
     $$
     DECLARE
         download_id integer;
-        query_id integer;
     BEGIN
-        SELECT d.id INTO download_id FROM download_advanced d WHERE d.user_id = u_id ORDER BY d.id desc LIMIT 1;
-
-        INSERT INTO query_advanced(d_id, original_query, normalized_query, query_hash)
-        VALUES(download_id, query, query, md5(query));
+         INSERT INTO download_advanced(timestamp, user_id) VALUES(ts, u_id);
+         SELECT d.id INTO download_id FROM download_advanced d WHERE d.user_id = u_id ORDER BY d.id desc LIMIT 1;
+         RETURN download_id;
     END
     $$;
 end;
-CALL save_query_advanced('SELECT * FROM accounts WHERE id = #i1 AND id = #i2 AND t like #s1 AND test < #t1',1 );
 
-DROP procedure if exists save_parameters;
-CREATE OR REPLACE procedure save_parameters(u_id integer, result_nr integer, result_hash text, int_array integer[], string_array varchar[], timestamp_array varchar[])
+
+
+DROP function if exists save_query_advanced(text, integer);
+CREATE OR REPLACE function save_query_advanced(query text, download_id integer)
+RETURNS integer
 LANGUAGE plpgsql
 AS
     $$
@@ -114,17 +102,35 @@ AS
         query_id integer;
     BEGIN
 
-        SELECT q.id INTO query_id FROM download_advanced d INNER JOIN query_advanced q ON q.d_id = d.id WHERE d.user_id = u_id ORDER BY q.id desc LIMIT 1;
+        INSERT INTO query_advanced(d_id, original_query, normalized_query, query_hash)
+        VALUES(download_id, query, query, md5(query));
+        SELECT q.id INTO query_id FROM query_advanced q WHERE q.d_id = download_id ORDER BY q.id desc LIMIT 1;
+        RETURN query_id;
+    END
+    $$;
+end;
 
+
+DROP procedure if exists save_parameters;
+CREATE OR REPLACE procedure save_parameters(query_id integer, result_nr integer, result_hash text, int_array integer[], string_array varchar[], timestamp_array varchar[])
+LANGUAGE plpgsql
+AS
+    $$
+    BEGIN
         INSERT INTO parameters(q_id, result_nr, result_hash, int_array, string_array,timestamp_array) VALUES(query_id, result_nr, result_hash,int_array, string_array, timestamp_array);
     END
     $$;
 end;
 
+SELECT save_download_advanced(TIMESTAMP '2004-10-19 10:23:54', 1);
+
+SELECT save_query_advanced('SELECT * FROM accounts WHERE id = #i1 AND id = #i2 AND t like #s1 AND test < #t1',1 );
+
 CALL save_parameters(1, 1,md5('Result'),ARRAY [1,0,4], ARRAY ['test'], ARRAY['2004-10-19 10:23:54'] );
 
 
 select * from query_advanced;
+select * from parameters;
 select rebuild_query(1);
 
 

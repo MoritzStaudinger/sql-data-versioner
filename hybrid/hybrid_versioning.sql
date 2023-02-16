@@ -1,3 +1,4 @@
+
 -- Procedure for Hybrid approach
 DROP procedure if exists add_versioning_hybrid;
 CREATE OR REPLACE procedure add_versioning_hybrid(tablename varchar)

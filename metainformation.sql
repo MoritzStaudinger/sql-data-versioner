@@ -68,36 +68,42 @@ CREATE EVENT TRIGGER create_table_versioning_trigger ON ddl_command_end
     WHEN TAG IN ('CREATE TABLE')
     EXECUTE PROCEDURE create_table_versioning_function();
 
-DROP event trigger IF EXISTS add_column_versioning_trigger ;
-DROP FUNCTION IF EXISTS add_column_versioning_function();
-CREATE OR REPLACE FUNCTION add_column_versioning_function()
+DROP event trigger IF EXISTS alter_table_detection ;
+DROP FUNCTION IF EXISTS alter_table_detection_function();
+CREATE OR REPLACE FUNCTION alter_table_detection_function()
 RETURNS event_trigger
 AS $$
 DECLARE name varchar; obj record;
+    query varchar;
 BEGIN
     FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands()
     LOOP
-        RAISE NOTICE '% dropped object: % %.% %',
-                     tg_tag,
-                     obj.object_type,
-                     obj.command_tag,
-                     obj.schema_name,
-                     obj.object_identity;
+        SELECT current_query() into query;
     END LOOP;
     RAISE NOTICE 'event % %', tg_event, tg_tag;
-     SELECT object_identity INTO name FROM pg_event_trigger_ddl_commands() WHERE object_identity NOT LIKE '%_seq' AND object_identity NOT LIKE '%_pkey' AND object_identity NOT LIKE '%_hist' AND object_identity NOT LIKE '%versioned_tables%';
+     SELECT object_identity INTO name FROM pg_event_trigger_ddl_commands() WHERE object_identity NOT LIKE '%_seq' AND object_identity NOT LIKE '%_pkey' AND object_identity NOT LIKE '%_hist' AND object_identity NOT LIKE 'hist.%';
      IF name is null then
          RETURN;
      end if;
-     RAISE NOTICE 'add_column to: % ', name;
-     --CALL add_versioning_hybrid(name);
+    IF LOWER(query) like '%drop column%' then
+        RAISE NOTICE 'drop column';
+    end if;
+    IF LOWER(query) like '%add%' then
+        RAISE NOTICE 'add column in, %', name;
+    end if;
+    IF LOWER(query) like '%rename column%' then
+        RAISE NOTICE 'rename, %', name;
+    end if;
+    IF Lower(query) like '%rename%' then
+        RAISE NOTICE 'rename table, %', name;
+    end if;
 END;
 $$
 LANGUAGE plpgsql;
 
-CREATE EVENT TRIGGER add_column_versioning_trigger ON ddl_command_end
+CREATE EVENT TRIGGER alter_table_detection ON ddl_command_end
     WHEN TAG IN ('ALTER TABLE')
-    EXECUTE PROCEDURE add_column_versioning_function();
+    EXECUTE PROCEDURE alter_table_detection_function();
 
 SELECT * from accounts;
 
