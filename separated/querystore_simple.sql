@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS query_simple;
 DROP TABLE IF EXISTS download_simple;
 CREATE TABLE IF NOT EXISTS download_simple(
     id serial primary key,
+    doi text,
     timestamp TIMESTAMP,
     user_id serial
 );
@@ -9,7 +10,6 @@ CREATE TABLE IF NOT EXISTS download_simple(
 CREATE TABLE IF NOT EXISTS query_simple (
     id serial PRIMARY KEY,
     d_id serial,
-    doi text,
     original_query text,
     re_execute_query text,
     query_hash varchar(1024),

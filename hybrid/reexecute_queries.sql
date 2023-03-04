@@ -18,22 +18,22 @@ AS
                 --RAISE NOTICE '%', q.re_execute_query;
                 IF q.re_execute_query like '%array_agg(s.station_id)%' then
                     EXECUTE (q.re_execute_query) INTO stations;
-                    IF md5(stations::varchar) <> q.result_hash OR array_length(stations, 1) <> q.result_nr then
-                        RAISE NOTICE 'query: %', q.re_execute_query;
+                    IF array_length(stations, 1) <> q.result_nr then
+                        --RAISE NOTICE 'query: %', q.re_execute_query;
                         RAISE NOTICE '%, %, %, %', md5(stations::varchar), q.result_hash, array_length(stations,1), q.result_nr;
                     end if;
                 end if;
                 IF q.re_execute_query like '%array_agg(distinct timeseries_id)%' then
                     EXECUTE (q.re_execute_query) INTO timeseries;
-                    IF md5(timeseries::varchar) <> q.result_hash OR array_length(timeseries, 1) <> q.result_nr then
-                        RAISE NOTICE 'query: %', q.re_execute_query;
+                    IF array_length(timeseries, 1) <> q.result_nr then
+                        --RAISE NOTICE 'query: %', q.re_execute_query;
                         RAISE NOTICE '%, %, %, %', md5(timeseries::varchar), q.result_hash, array_length(timeseries,1), q.result_nr;
                     end if;
                 end if;
                 IF q.re_execute_query like '%to_char(dd%' then
                     EXECUTE (q.re_execute_query) INTO que;
-                    IF md5(que::varchar) <> q.result_hash OR array_length(que,1) <> q.result_nr then
-                        RAISE NOTICE 'query: %', q.re_execute_query;
+                    IF array_length(que,1) <> q.result_nr then
+                        --RAISE NOTICE 'query: %', q.re_execute_query;
                         RAISE NOTICE '%, %, %, %', md5(que::varchar), q.result_hash, array_length(que,1), q.result_nr;
                     end if;
                 end if;

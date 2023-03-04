@@ -101,3 +101,7 @@ AS
     END
     $$;
 end;
+
+SELECT now();
+call add_all_versioning();
+SELECT now();
