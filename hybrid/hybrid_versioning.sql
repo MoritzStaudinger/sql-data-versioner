@@ -105,3 +105,5 @@ end;
 SELECT now();
 call add_all_versioning();
 SELECT now();
+
+call add_versioning_hybrid('data.dataset');

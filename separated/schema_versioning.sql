@@ -1,21 +1,3 @@
-CREATE SCHEMA hist;
-
-DROP VIEW IF EXISTS hist.primary_keys;
-CREATE VIEW hist.primary_keys AS
-SELECT tc.table_name,
-    c.column_name
-   FROM information_schema.table_constraints tc
-     JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
-     JOIN information_schema.columns c ON c.table_schema::name = tc.constraint_schema::name AND tc.table_name::name = c.table_name::name AND ccu.column_name::name = c.column_name::name
-  WHERE tc.constraint_type::text = 'PRIMARY KEY'::text;
-
-DROP TABLE IF EXISTS hist.versioned_tables;
-CREATE TABLE hist.versioned_tables(
-    name VARCHAR(100),
-    PRIMARY KEY (name)
-);
-
-
 
 DROP event trigger IF EXISTS drop_trigger;
 DROP FUNCTION IF EXISTS drop_trigger_function();
@@ -120,8 +102,26 @@ CREATE OR REPLACE procedure rename_column_event(query text)
 LANGUAGE plpgsql
 AS
     $$
+    DECLARE name varchar;
+        orig_name varchar;
+        columnnames varchar;
+        orig_column varchar;
+        schemaname varchar;
+        new_column varchar;
     BEGIN
+            SELECT SPLIT_PART(SPLIT_PART(lower(query), lower('ALTER TABLE '), 2),lower(' RENAME '),1) into name;
+            SELECT SPLIT_PART(name, '.', 2) INTO orig_name;
+            SELECT SPLIT_PART(name, '.', 1) INTO schemaname;
+            SELECT SPLIT_PART(SPLIT_PART(lower(query), lower('RENAME '), 2),';',1) into columnnames;
+            SELECT SPLIT_PART(lower(columnnames), lower(' TO'), 1) into orig_column;
+            SELECT SPLIT_PART(lower(columnnames), lower('TO '), 2) into new_column;
+            IF (orig_name not like '%_hist%') THEN
+                execute format('ALTER TABLE hist.%1$s_hist RENAME %2$s_hist', orig_name, columnnames);
+                call adapt_triggers(orig_name, schemaname,orig_name);
+                -- Rudimentary rewrite. needs to be adapted for table.column and table-abbreviation.column and normal columnname. This can lead to problems with queries, when two tables have the same name for a column
+                execute format('UPDATE query_simple SET re_execute_query = REPLACE(re_execute_query, ''%1$s'', ''%2$s'') WHERE re_execute_query like ''%%%1$s%%'' ', orig_column,new_column);
 
+            end if;
     END
     $$;
 end;
@@ -134,15 +134,17 @@ AS
     DECLARE name varchar;
         orig_name varchar;
         columnname varchar;
+        schemaname varchar;
     BEGIN
             SELECT SPLIT_PART(SPLIT_PART(lower(query), lower('ALTER TABLE '), 2),lower(' ADD COLUMN '),1) into name;
             SELECT SPLIT_PART(name, '.', 2) INTO orig_name;
+            SELECT SPLIT_PART(name, '.', 1) INTO schemaname;
             SELECT SPLIT_PART(SPLIT_PART(lower(query), lower('ADD COLUMN '), 2),';',1) into columnname;
 
 
             IF (orig_name not like '%_hist%') THEN
                 execute format('ALTER TABLE hist.%1$s_hist ADD COLUMN %2$s', orig_name, columnname);
-                call adapt_triggers(orig_name, 'public',orig_name);
+                call adapt_triggers(orig_name, schemaname,orig_name);
                 -- no rewriting necessary
             end if;
     END
@@ -270,21 +272,3 @@ AS
     end;
 $$
 end;
-
-
-
-
-DROP event trigger IF EXISTS test_trigger ;
-DROP FUNCTION IF EXISTS test_trigger_function();
-CREATE OR REPLACE FUNCTION test_trigger_function()
-RETURNS event_trigger
-AS $$
-BEGIN
-    RAISE NOTICE '%', current_query();
-END;
-$$
-LANGUAGE plpgsql;
-
-CREATE EVENT TRIGGER test_trigger ON ddl_command_start
-    WHEN TAG IN ('CREATE TABLE', 'DROP TABLE')
-    EXECUTE PROCEDURE test_trigger_function();

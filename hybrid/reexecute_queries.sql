@@ -43,6 +43,6 @@ AS
     $$;
 end;
 
-SELECT reexecute_queries(51);
+SELECT reexecute_queries(1);
 
 select * from download_simple;
